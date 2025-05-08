@@ -172,3 +172,17 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Checkpoints file
+
+stt_scic/ckpts/*.pt
+stt_scic/ckpts/*.pth
+stt_scic/ckpts/*.ckpt
+stt_scic/ckpts/*.ckpt.*
+stt_scic/ckpts/*.bin
+stt_scic/ckpts/*.h5
+stt_scic/ckpts/*.keras
+stt_scic/ckpts/*.msgpack
+stt_scic/ckpts/*.safetensors
+stt_scic/ckpts/*.onnx
+stt_scic/ckpts/*.pkl
