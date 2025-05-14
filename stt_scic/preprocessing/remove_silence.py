@@ -2,8 +2,9 @@ import collections
 import contextlib
 import sys
 import wave
-
+# cần tải webrtcvad
 import webrtcvad
+
 
 
 def read_wave(path):
