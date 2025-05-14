@@ -1,6 +1,11 @@
+
 from stt_scic.train.example_trainer import ExampleTrainer
 from stt_scic.utils.text_normalizer import normalize_text
-from stt_scic.preprocessing import *
+
+from stt_scic.preprocessing.denoise import denoise_audio
+from stt_scic.preprocessing.remove_silence import remove_silence
+from stt_scic.preprocessing.record_voice import record_audio
+
 from stt_scic.postprocessing import *
 
 class ASRPipeline:
