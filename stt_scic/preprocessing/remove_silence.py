@@ -171,7 +171,7 @@ def remove_silence(input_wav_path, output_wav_path, aggressiveness):
 
 if __name__ == '__main__':
     # ----- THAY ĐỔI CÁC GIÁ TRỊ NÀY -----
-    input_file = '/Users/vietnguyen/Desktop/Deep learning/s2t_scic/s2t-egg-club/stt_scic/data/my_voice/output_recording.wav'  # Đường dẫn đến file WAV đầu vào của bạn
+    input_file = '/Users/vietnguyen/Desktop/Deep learning/s2t_scic/s2t-egg-club/stt_scic/data/my_voice/denoise_recording.wav'  # Đường dẫn đến file WAV đầu vào của bạn
     output_file = '/Users/vietnguyen/Desktop/Deep learning/s2t_scic/s2t-egg-club/stt_scic/data/rm_silence/output_recording.wav' # Đường dẫn đến file WAV đầu ra
     vad_mode = 1  # Mức độ 공격 tính của VAD (0 đến 3)
                       # 0: ít 공격 tính nhất, giữ lại nhiều âm thanh hơn
