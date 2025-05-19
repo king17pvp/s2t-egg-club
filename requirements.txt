@@ -1,0 +1,5 @@
+flask==2.2.5
+flask_socketio==5.3.6
+werkzeug==2.2.3
+dnspython==2.2.0
+eventlet==0.33.0
