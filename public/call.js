@@ -6,25 +6,23 @@ const socket = io({
   timeout: 60000
 });
 
-
 const localAudio = document.getElementById("localAudio");
 const remoteAudio = document.getElementById("remoteAudio");
-const recordedAudio = document.getElementById("recordedAudio");
 const transcriptionBox = document.getElementById("transcription");
 const callPopup = document.getElementById("callPopup");
 const btnCall = document.getElementById("btnCall");
+
+let localStream = null;
+let mediaRecorder = null;
+let peerConnection = null;
 
 document.getElementById('btnCall').addEventListener('click', handleCallButton);
 document.getElementById('btnStopCall').addEventListener('click', stopCall);
 document.getElementById('btnMute').addEventListener('click', function() {
   toggleMute(this);
 });
-document.getElementById('btnS2T').addEventListener('click', speechtoText);
 document.getElementById('btnShowText').addEventListener('click', showTranscription);
-document.getElementById('btnClosePopup').addEventListener('click', closeCallPopup);
-
-let localStream, mediaRecorder, recordedChunks = [];
-let peerConnection;
+// document.getElementById('btnClosePopup').addEventListener('click', closeCallPopup);
 
 const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
@@ -44,26 +42,201 @@ socket.on("offer", async (offer) => {
   peerConnection = new RTCPeerConnection(config);
   setupPeerEvents();
 
-  await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-  const answer = await peerConnection.createAnswer();
-  await peerConnection.setLocalDescription(answer);
-
-  socket.emit("answer", answer);
+  try {
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    socket.emit("answer", answer);
+  } catch (err) {
+    console.error("Lỗi xử lý offer:", err);
+  }
 });
 
 // Socket nhận answer
 socket.on("answer", async (answer) => {
   if (!peerConnection) return;
-  await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+  try {
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+  } catch (err) {
+    console.error("Lỗi xử lý answer:", err);
+  }
 });
 
 // Socket nhận ICE candidate
 socket.on("ice", (candidate) => {
   if (peerConnection) {
-    peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    peerConnection.addIceCandidate(new RTCIceCandidate(candidate))
+      .catch(e => console.error("Lỗi thêm ICE candidate:", e));
   }
 });
 
+// Socket nhận transcript text
+socket.on("transcript", (data) => {
+    console.log("Nhận transcript:", data);
+
+    // Lấy references một lần
+    const container = document.getElementById("transcription-container");
+    const output = document.getElementById("transcription-output");
+
+    if (!container || !output) {
+        console.error("Không tìm thấy elements transcription");
+        return;
+    }
+
+    // Hiển thị container nếu đang ẩn
+    if (container.style.display === "none") {
+        container.style.display = "block";
+    }
+
+    // Xử lý dữ liệu nhận được
+    if (typeof data === 'string') {
+        // Nếu nhận trực tiếp string
+        output.value += ' ' + data;
+    } else if (data.text) {
+        // Nếu nhận object có field text
+        output.value += ' ' + data.text;
+    } else if (data.error) {
+        // Nếu có lỗi
+        output.value += '\n🔴 Lỗi: ' + data.error;
+        console.error('Transcript error:', data.error);
+    } else {
+        console.warn('Định dạng transcript không hợp lệ:', data);
+        return;
+    }
+
+    // Auto scroll xuống dưới
+    output.scrollTop = output.scrollHeight;
+});
+
+// Sửa lại function showTranscription chỉ để toggle hiển thị
+function showTranscription() {
+  if (transcriptionBox.style.display === "none") {
+    transcriptionBox.style.display = "block";
+  } else {
+    transcriptionBox.style.display = "none"; 
+  }
+}
+
+async function startSendingAudioStream() {
+  if (!localStream) return;
+
+  const audioContext = new AudioContext({
+    sampleRate: 16000
+  });
+
+  const source = audioContext.createMediaStreamSource(localStream);
+  const processor = audioContext.createScriptProcessor(8192, 1, 1);
+
+  source.connect(processor);
+  processor.connect(audioContext.destination);
+
+  let chunkIndex = 0;
+  const MAX_CHUNKS = 5;
+  const audioChunks = [];
+
+  const VOLUME_THRESHOLD = 0.02; // Có thể điều chỉnh
+
+  processor.onaudioprocess = (e) => {
+    const inputData = e.inputBuffer.getChannelData(0);
+
+    // Tính RMS để phát hiện tiếng nói
+    const rms = Math.sqrt(inputData.reduce((sum, sample) => sum + sample * sample, 0) / inputData.length);
+    const isSpeaking = rms > VOLUME_THRESHOLD;
+
+    if (isSpeaking) {
+      console.log("🗣️ User is speaking");
+
+      const wavBuffer = createWAVBuffer(inputData, audioContext.sampleRate);
+      const base64String = arrayBufferToBase64(wavBuffer);
+      audioChunks.push(base64String);
+
+      if (audioChunks.length >= MAX_CHUNKS) {
+        audioChunks.forEach((chunk, index) => {
+          socket.emit('audio', {
+            data: chunk,
+            chunkIndex: index,
+            totalChunks: audioChunks.length
+          });
+        });
+
+        audioChunks.length = 0;
+        chunkIndex = 0;
+      }
+    } else {
+      console.log("🤫 Silence detected, not sending");
+    }
+  };
+
+  function createWAVBuffer(audioData, sampleRate) {
+    const buffer = new ArrayBuffer(44 + audioData.length * 2);
+    const view = new DataView(buffer);
+
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + audioData.length * 2, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, audioData.length * 2, true);
+
+    let index = 44;
+    for (let i = 0; i < audioData.length; i++) {
+      view.setInt16(index, audioData[i] * 0x7FFF, true);
+      index += 2;
+    }
+
+    return buffer;
+  }
+
+  function writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  }
+
+  function arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
+    return btoa(binary);
+  }
+
+  return () => {
+    if (audioChunks.length > 0) {
+      audioChunks.forEach((chunk, index) => {
+        socket.emit('audio', {
+          data: chunk,
+          chunkIndex: index,
+          totalChunks: audioChunks.length
+        });
+      });
+    }
+
+    processor.disconnect();
+    source.disconnect();
+    audioContext.close();
+  };
+}
+
+function stopCall() {
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+    remoteAudio.srcObject = null;
+    
+    // Dọn dẹp audio processing
+    if (this.audioCleanup) {
+      this.audioCleanup();
+      this.audioCleanup = null;
+    }
+  }
+  closeCallPopup();
+}
 function setupPeerEvents() {
   if (!peerConnection) return;
 
@@ -75,66 +248,32 @@ function setupPeerEvents() {
     remoteAudio.srcObject = e.streams[0];
   };
 
-  // Thêm track audio từ localStream vào kết nối
   if (localStream) {
     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
   }
 }
 
 // Hàm bật popup và bắt đầu gọi
-function handleCallButton() {
-  openCallPopup();
-  startCall();
-  
-}
-
-// Bắt đầu cuộc gọi: tạo offer, gửi qua socket, bắt đầu ghi âm
 function startCall() {
   peerConnection = new RTCPeerConnection(config);
   setupPeerEvents();
 
   peerConnection.createOffer()
-    .then(offer => {
-      return peerConnection.setLocalDescription(offer).then(() => offer);
-    })
+    .then(offer => peerConnection.setLocalDescription(offer).then(() => offer))
     .then(offer => {
       socket.emit("offer", offer);
     })
     .catch(err => {
       alert("Lỗi khi tạo offer: " + err);
+      console.error(err);
     });
-  if (localStream) {
-    mediaRecorder = new MediaRecorder(localStream);
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) recordedChunks.push(e.data);
-    };
-  
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(recordedChunks, { type: "audio/webm" });
-      recordedAudio.src = URL.createObjectURL(blob);
-    };
-  
-    mediaRecorder.start();  
-  }
 }
 
-// Dừng cuộc gọi, đóng kết nối, dừng stream, ẩn popup
-function stopCall() {
-  if (peerConnection) {
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
-
-    peerConnection.close();
-    peerConnection = null;
-
-    remoteAudio.srcObject = null;
-
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-      mediaRecorder.stop();
-    }
-  }
-  closeCallPopup();
+// Xử lý nút gọi
+function handleCallButton() {
+  openCallPopup();
+  startCall();
+  startSendingAudioStream();
 }
 
 // Bật / tắt tiếng micro
@@ -145,15 +284,12 @@ function toggleMute(button) {
     track.enabled = !track.enabled;
   });
 
-  // Đổi icon hoặc màu nút
   if (button.innerText === "🔇 Tắt tiếng") {
     button.innerText = "🎤 Bật tiếng";
   } else {
     button.innerText = "🔇 Tắt tiếng";
   }
 }
-
-
 
 // Mở popup cuộc gọi
 function openCallPopup() {
@@ -167,34 +303,4 @@ function closeCallPopup() {
   callPopup.classList.add("hidden");
   btnCall.disabled = false;
   btnCall.style.backgroundColor = "";
-}
-
-// Chuyển giọng nói thành văn bản (speech-to-text)
-function speechtoText() {
-  if (!('webkitSpeechRecognition' in window)) {
-    alert("Trình duyệt không hỗ trợ nhận diện giọng nói");
-    return;
-  }
-
-  const recognition = new webkitSpeechRecognition();
-  recognition.lang = "vi-VN";  
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    transcriptionBox.value += transcript + "\n";
-  };
-
-  recognition.onerror = (event) => {
-    alert("Lỗi nhận diện giọng nói: " + event.error);
-  };
-
-  recognition.start();
-}
-
-// Hiển thị khung transcription nếu đang ẩn
-function showTranscription() {
-  transcriptionBox.style.display = "block";
-  transcriptionBox.focus();
 }

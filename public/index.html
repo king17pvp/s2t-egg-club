@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>WebRTC Audio Call</title>
+  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.0/dist/ffmpeg.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
   <style>
     * {
@@ -234,13 +235,13 @@
       <button id="btnCall">📞 Gọi</button>
       <button id="btnStopCall">📞 Kết thúc</button>
       <button id="btnMute">🔇 Tắt tiếng</button>
-      <button id="btnS2T">S2T</button>
-      <button id="btnShowText">Show text</button>
+      <!-- <button id="btnS2T">S2T</button> -->
+      <button id="btnShowText">Show Speech to Text</button>
     </div>
 
-    <div class="text-group">
+    <div class="text-group" id="transcription-container" style="display: none;">
       <label>📝 Chuyển đổi giọng nói thành văn bản</label>
-      <textarea id="transcription" rows="4"></textarea>
+      <textarea id="transcription-output" rows="4" readonly></textarea>
     </div>
 
     <div class="audio-group">
@@ -249,9 +250,9 @@
 
       <label>📥 Âm thanh nhận</label>
       <audio id="remoteAudio" autoplay></audio>
-
+<!-- 
       <label>📼 Ghi âm</label>
-      <audio id="recordedAudio" controls></audio>
+      <audio id="recordedAudio" controls></audio> -->
     </div>
   </div>
 
