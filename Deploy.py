@@ -65,7 +65,7 @@ def audio_worker():
         try:
             print(f"🎧 Xử lý audio từ {client_id}")
             res = requests.post(
-                "https://f783-123-24-123-139.ngrok-free.app/transcribe",
+                "https://localhost:8000/transcribe",
                 json={"audio_base64": combined_audio, "file_ext": "wav"}
             )
             if not res.ok:
@@ -76,7 +76,7 @@ def audio_worker():
                 raise Exception("No task_id in response")
 
             for _ in range(20):
-                result_res = requests.get(f"https://f783-123-24-123-139.ngrok-free.app/result/{task_id}")
+                result_res = requests.get(f"https://localhost:8000/result/{task_id}")
                 result_json = result_res.json()
                 print(result_json) 
                 status = result_json.get("status")
@@ -171,5 +171,5 @@ def handle_ice(data):
 # ============================
 if __name__ == "__main__":
     eventlet.spawn(audio_worker)
-    port = int(os.environ.get("PORT", 3000))
+    port = int(os.environ.get("PORT", 8001))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
