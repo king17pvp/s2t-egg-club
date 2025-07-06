@@ -173,6 +173,11 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+
+
+#venv in web call audio 
+venv311
+
 # Checkpoints file
 
 stt_scic/ckpts/*.pt
