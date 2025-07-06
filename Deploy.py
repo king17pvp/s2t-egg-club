@@ -65,7 +65,7 @@ def audio_worker():
         try:
             print(f"🎧 Xử lý audio từ {client_id}")
             res = requests.post(
-                "https://localhost:8000/transcribe",
+                "http://backend:8000/transcribe",
                 json={"audio_base64": combined_audio, "file_ext": "wav"}
             )
             if not res.ok:
@@ -76,7 +76,7 @@ def audio_worker():
                 raise Exception("No task_id in response")
 
             for _ in range(20):
-                result_res = requests.get(f"https://localhost:8000/result/{task_id}")
+                result_res = requests.get(f"http://backend:8000/result/{task_id}")
                 result_json = result_res.json()
                 print(result_json) 
                 status = result_json.get("status")
@@ -135,7 +135,7 @@ def handle_audio(data_audio):
         client_id = request.sid
         chunk_data = data_audio.get('data')
         chunk_index = data_audio.get('chunkIndex', 0)
-        total_chunks = data_audio.get('totalChunks', 5)
+        total_chunks = data_audio.get('totalChunks', 10)
 
         print(f"📦 Nhận chunk {chunk_index + 1}/{total_chunks} từ {client_id}")
         combined_audio = chunk_manager.add_chunk(client_id, chunk_data, chunk_index, total_chunks)
