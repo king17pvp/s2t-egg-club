@@ -33,14 +33,18 @@ s2t-egg-club/
 
 1. Using Docker Compose (recommended):
 ```bash
-# Build and start the service in detached mode
-docker compose up -d
+
+# If run for the first time
+docker-compose up -d --build
+
+# Build and start the service in detached mode (if run for the second time)
+docker-compose up -d
 
 # View logs
-docker compose logs -f
+docker-compose logs -f
 
 # Stop the container
-docker compose down
+docker-compose down
 ```
 
 The API for development will be available at `http://localhost:8000`
