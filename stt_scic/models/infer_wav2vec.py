@@ -1,5 +1,7 @@
 import torch
+import torchaudio
 import time
+import scipy
 from datasets import Audio
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from .model import STTModel
@@ -18,10 +20,13 @@ class Wav2Vec(STTModel):
     
     def transcribe(self, audio_path: str) -> str:
         try:
-            audio_loader = Audio(sampling_rate=16000)
-            audio_data = audio_loader.decode_example(audio_loader.encode_example(audio_path))
-            
-            speech_array = torch.tensor(audio_data["array"], dtype=torch.float32)
+            waveform, sample_rate = torchaudio.load(audio_path)  # waveform is a tensor
+
+            # Optional: Resample if needed
+            if sample_rate != 16000:
+                resampler = torchaudio.transforms.Resample(orig_freq=sample_rate, new_freq=16000)
+                waveform = resampler(waveform)
+            speech_array = torch.tensor(waveform.squeeze(), dtype=torch.float32)
             
             inputs = self.processor(speech_array, return_tensors="pt", sampling_rate=16000, padding=True)
             input_values = inputs.input_values.to(self.device)

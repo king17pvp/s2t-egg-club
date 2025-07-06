@@ -131,10 +131,10 @@ async function startSendingAudioStream() {
   processor.connect(audioContext.destination);
 
   let chunkIndex = 0;
-  const MAX_CHUNKS = 5;
+  const MAX_CHUNKS = 10;
   const audioChunks = [];
 
-  const VOLUME_THRESHOLD = 0.02; // Có thể điều chỉnh
+  const VOLUME_THRESHOLD = 0.01; // Có thể điều chỉnh
 
   processor.onaudioprocess = (e) => {
     const inputData = e.inputBuffer.getChannelData(0);
