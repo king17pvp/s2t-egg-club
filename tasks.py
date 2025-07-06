@@ -37,18 +37,20 @@ stt_model.load_checkpoints()
 @app.task()
 def transcribe_audio_base64(audio_base64: str, file_ext: str = "wav"):
     print(">>> Received task to transcribe audio")
+    print(">>> Help me !!!")
     try:
         # Decode and write to temp file
-        file_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}.{file_ext}")
+        # file_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}.{file_ext}")
+        # with open(file_path, "wb") as f:
+        #     f.write(base64.b64decode(audio_base64))
+        file_path = f"examples/{uuid.uuid4()}.{file_ext}"
         with open(file_path, "wb") as f:
             f.write(base64.b64decode(audio_base64))
-        # with open(f"{uuid.uuid4()}.{file_ext}", "wb") as f:
-        #     f.write(base64.b64decode(audio_base64))
         # Transcribe
         result = stt_model.transcribe(file_path)
         transcription = result["text"]
         print(">>> Transcription done")
-        os.remove(file_path)
+        # os.remove(file_path)
         return transcription
 
     except Exception as e:
