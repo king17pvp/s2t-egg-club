@@ -8,7 +8,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
-venv311/
+venv310/
 *.egg-info/
 dist/
 build/
