@@ -11,3 +11,13 @@ regex==2024.11.6
 tiktoken==0.9.0
 srt==3.5.3
 websockets==15.0.1
+fastapi
+redis
+torch
+celery
+uvicorn
+transformers
+accelerate	
+torchaudio
+librosa
+datasets
