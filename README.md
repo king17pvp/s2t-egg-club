@@ -12,7 +12,7 @@ A real-time speech-to-text application using Flask-SocketIO for WebSocket commun
 
 ## Prerequisites
 
-- Python 3.11.9
+- Python 3.10
 - FFmpeg (for audio processing)
 - Docker and Docker Compose (optional, for containerized deployment)
 
@@ -20,45 +20,20 @@ A real-time speech-to-text application using Flask-SocketIO for WebSocket commun
 
 ```
 s2t-egg-club/
-├── Deploy.py           # Main application server
-├── pipeline.py         # Audio processing pipeline
-├── requirements.txt    # Python dependencies
-├── public/            # Static files
-├── stt_scic/          # Core application code
-├── Dockerfile         # Docker configuration
-└── compose.yaml       # Docker Compose configuration
+├── Deploy.py                 # Main application server
+├── pipeline.py               # Audio processing pipeline
+├── requirements.txt          # Python dependencies
+├── public/                   # Static files
+├── stt_scic/                 # Core application code
+├── Dockerfile                # Docker configuration
+└── docker-compose.yaml       # Docker Compose configuration
 ```
 
 ## Installation
 
-### Local Development Setup
-
-1. Create a virtual environment:
-```bash
-python -m venv venv311
-# On Windows:
-.\venv311\Scripts\activate
-# On Unix-like systems:
-source venv311/bin/activate
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-3. Run the application:
-```bash
-python Deploy.py
-```
-
-The application will be available at `http://localhost:3000`
-
-### Docker Deployment
-
 1. Using Docker Compose (recommended):
 ```bash
-# Build and start the container
+# Build and start the service in detached mode
 docker compose up -d
 
 # View logs
@@ -68,16 +43,9 @@ docker compose logs -f
 docker compose down
 ```
 
-2. Using Docker directly:
-```bash
-# Build the image
-docker build -t s2t-egg-club .
+The API for development will be available at `http://localhost:8000`
 
-# Run the container
-docker run -p 3000:3000 s2t-egg-club
-```
-
-The application will be available at `http://localhost:3000`
+The demo application will be available at `http://localhost:8001`
 
 ## Environment Variables
 
@@ -109,23 +77,3 @@ The project uses Eventlet for asynchronous processing and Flask-SocketIO for Web
 - `AudioChunkManager`: Manages audio chunk assembly
 - `audio_worker`: Background worker for audio processing
 - WebSocket handlers for real-time communication
-
-## Troubleshooting
-
-1. If the application fails to start, check:
-   - Port 3000 is not in use
-   - FFmpeg is installed
-   - All dependencies are installed correctly
-
-2. For Docker issues:
-   - Ensure Docker daemon is running
-   - Check logs with `docker compose logs`
-   - Verify port mapping is correct
-
-## License
-
-[Add your license information here]
-
-## Contributing
-
-[Add contribution guidelines here]
