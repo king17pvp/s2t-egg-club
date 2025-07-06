@@ -1,5 +1,5 @@
 import torch
-from model import STTModel
+from .model import STTModel
 
 class Whisper(STTModel):
     def __init__(self):

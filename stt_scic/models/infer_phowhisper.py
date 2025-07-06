@@ -1,6 +1,6 @@
 import torch
 from transformers import pipeline
-from model import STTModel
+from .model import STTModel
 
 class Phowhisper(STTModel):
     def __init__(self):
