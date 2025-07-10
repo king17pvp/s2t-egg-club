@@ -11,38 +11,8 @@ from eventlet.queue import Queue
 import requests
 
 # ============================
-# Audio Chunk Manager
-# ============================
-class AudioChunkManager:
-    def __init__(self):
-        self.chunks = {}
-
-    def add_chunk(self, client_id, chunk_data, chunk_index, total_chunks):
-        if client_id not in self.chunks:
-            self.chunks[client_id] = {'data': {}, 'total': total_chunks}
-        self.chunks[client_id]['data'][chunk_index] = chunk_data
-
-        if len(self.chunks[client_id]['data']) == total_chunks:
-            return self.combine_chunks(client_id)
-        return None
-
-    def combine_chunks(self, client_id):
-        if client_id not in self.chunks:
-            return None
-        client_chunks = self.chunks[client_id]
-        sorted_chunks = [client_chunks['data'][i] for i in range(client_chunks['total'])]
-        combined_base64 = ''.join(sorted_chunks)
-        del self.chunks[client_id]
-        return combined_base64
-
-    def clear_client(self, client_id):
-        if client_id in self.chunks:
-            del self.chunks[client_id]
-
-# ============================
 # Flask & SocketIO Setup
 # ============================
-chunk_manager = AudioChunkManager()
 audio_queue = Queue()
 app = Flask(__name__, static_folder="public")
 socketio = SocketIO(
@@ -60,12 +30,13 @@ clients = set()
 # Worker Function
 # ============================
 def audio_worker():
+    nums = 0
     while True:
         client_id, combined_audio = audio_queue.get()
         try:
             print(f"🎧 Xử lý audio từ {client_id}")
             res = requests.post(
-                "http://backend:8000/transcribe",
+                "http://backend:8000/transcribe/",
                 json={"audio_base64": combined_audio, "file_ext": "wav"}
             )
             if not res.ok:
@@ -134,15 +105,9 @@ def handle_audio(data_audio):
     try:
         client_id = request.sid
         chunk_data = data_audio.get('data')
-        chunk_index = data_audio.get('chunkIndex', 0)
-        total_chunks = data_audio.get('totalChunks', 10)
 
-        print(f"📦 Nhận chunk {chunk_index + 1}/{total_chunks} từ {client_id}")
-        combined_audio = chunk_manager.add_chunk(client_id, chunk_data, chunk_index, total_chunks)
-
-        if combined_audio:
-            print(f"🔄 Ghép {total_chunks} chunks từ {client_id}")
-            audio_queue.put((client_id, combined_audio))
+        print(f"🎧 Nhận audio từ {client_id}")
+        audio_queue.put((client_id, chunk_data))
 
     except Exception as e:
         print(f"Error processing chunk: {str(e)}")

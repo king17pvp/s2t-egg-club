@@ -36,7 +36,6 @@ navigator.mediaDevices.getUserMedia({ audio: true })
     alert("Không thể truy cập microphone: " + err);
   });
 
-// Socket nhận offer từ người khác
 socket.on("offer", async (offer) => {
   openCallPopup();
   peerConnection = new RTCPeerConnection(config);
@@ -91,10 +90,10 @@ socket.on("transcript", (data) => {
     // Xử lý dữ liệu nhận được
     if (typeof data === 'string') {
         // Nếu nhận trực tiếp string
-        output.value += ' ' + data;
+        output.value += ' ' + data + '\n';
     } else if (data.text) {
         // Nếu nhận object có field text
-        output.value += ' ' + data.text;
+        output.value += ' ' + data.text + '\n';
     } else if (data.error) {
         // Nếu có lỗi
         output.value += '\n🔴 Lỗi: ' + data.error;
@@ -108,7 +107,6 @@ socket.on("transcript", (data) => {
     output.scrollTop = output.scrollHeight;
 });
 
-// Sửa lại function showTranscription chỉ để toggle hiển thị
 function showTranscription() {
   if (transcriptionBox.style.display === "none") {
     transcriptionBox.style.display = "block";
@@ -120,52 +118,56 @@ function showTranscription() {
 async function startSendingAudioStream() {
   if (!localStream) return;
 
-  const audioContext = new AudioContext({
-    sampleRate: 16000
-  });
-
+  const audioContext = new AudioContext({ sampleRate: 16000 });
   const source = audioContext.createMediaStreamSource(localStream);
-  const processor = audioContext.createScriptProcessor(8192, 1, 1);
+  const processor = audioContext.createScriptProcessor(16384, 1, 1);
 
   source.connect(processor);
   processor.connect(audioContext.destination);
 
-  let chunkIndex = 0;
-  const MAX_CHUNKS = 10;
   const audioChunks = [];
 
-  const VOLUME_THRESHOLD = 0.01; // Có thể điều chỉnh
+  const VOLUME_THRESHOLD = 0.01;
 
   processor.onaudioprocess = (e) => {
     const inputData = e.inputBuffer.getChannelData(0);
 
-    // Tính RMS để phát hiện tiếng nói
+    // Tính RMS
     const rms = Math.sqrt(inputData.reduce((sum, sample) => sum + sample * sample, 0) / inputData.length);
     const isSpeaking = rms > VOLUME_THRESHOLD;
 
     if (isSpeaking) {
       console.log("🗣️ User is speaking");
-
-      const wavBuffer = createWAVBuffer(inputData, audioContext.sampleRate);
-      const base64String = arrayBufferToBase64(wavBuffer);
-      audioChunks.push(base64String);
-
-      if (audioChunks.length >= MAX_CHUNKS) {
-        audioChunks.forEach((chunk, index) => {
-          socket.emit('audio', {
-            data: chunk,
-            chunkIndex: index,
-            totalChunks: audioChunks.length
-          });
-        });
-
-        audioChunks.length = 0;
-        chunkIndex = 0;
-      }
+      audioChunks.push(new Float32Array(inputData));
     } else {
       console.log("🤫 Silence detected, not sending");
     }
   };
+
+  const sendInterval = setInterval(() => {
+    if (audioChunks.length > 0) {
+      console.log("🔄 Combining and sending audio");
+
+      const totalLength = audioChunks.reduce((sum, arr) => sum + arr.length, 0);
+      const combinedPCM = new Float32Array(totalLength);
+      let offset = 0;
+      audioChunks.forEach(arr => {
+        combinedPCM.set(arr, offset);
+        offset += arr.length;
+      });
+
+      // Create WAV buffer
+      const wavBuffer = createWAVBuffer(combinedPCM, audioContext.sampleRate);
+      const base64String = arrayBufferToBase64(wavBuffer);
+
+      // Send as single chunk
+      socket.emit('audio', {
+        data: base64String
+      });
+
+      audioChunks.length = 0;
+    }
+  }, 5000);
 
   function createWAVBuffer(audioData, sampleRate) {
     const buffer = new ArrayBuffer(44 + audioData.length * 2);
@@ -187,7 +189,8 @@ async function startSendingAudioStream() {
 
     let index = 44;
     for (let i = 0; i < audioData.length; i++) {
-      view.setInt16(index, audioData[i] * 0x7FFF, true);
+      const s = Math.max(-1, Math.min(1, audioData[i]));
+      view.setInt16(index, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
       index += 2;
     }
 
@@ -202,21 +205,13 @@ async function startSendingAudioStream() {
 
   function arrayBufferToBase64(buffer) {
     const bytes = new Uint8Array(buffer);
-    const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
+    let binary = '';
+    bytes.forEach(b => binary += String.fromCharCode(b));
     return btoa(binary);
   }
 
   return () => {
-    if (audioChunks.length > 0) {
-      audioChunks.forEach((chunk, index) => {
-        socket.emit('audio', {
-          data: chunk,
-          chunkIndex: index,
-          totalChunks: audioChunks.length
-        });
-      });
-    }
-
+    clearInterval(sendInterval);
     processor.disconnect();
     source.disconnect();
     audioContext.close();
@@ -270,10 +265,10 @@ function startCall() {
 }
 
 // Xử lý nút gọi
-function handleCallButton() {
+async function handleCallButton() {
   openCallPopup();
   startCall();
-  startSendingAudioStream();
+  this.audioCleanup = await startSendingAudioStream();
 }
 
 // Bật / tắt tiếng micro
